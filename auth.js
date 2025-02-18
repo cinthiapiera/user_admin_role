@@ -1,130 +1,82 @@
 import { auth, db } from "./firebase_config.js";
 import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword,
+    onAuthStateChanged,
+    signOut
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
 import { 
-  doc, 
-  setDoc, 
-  getDoc 
+    doc, 
+    setDoc, 
+    getDoc 
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 
-// Obtener elementos del DOM con verificación de existencia
-const registerBtn = document.getElementById("registerBtn");
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const userRoleDisplay = document.getElementById("userRoleDisplay");
+// Selección de elementos
+const registerContainer = document.getElementById("registerContainer");
+const loginContainer = document.getElementById("loginContainer");
+const showRegister = document.getElementById("showRegister");
+const showLogin = document.getElementById("showLogin");
 
-const registerSection = registerBtn ? registerBtn.parentElement : null;
-const loginSection = loginBtn ? loginBtn.parentElement : null;
+// Cambiar entre Login y Registro
+showRegister.addEventListener("click", () => {
+    loginContainer.classList.add("d-none");
+    registerContainer.classList.remove("d-none");
+});
 
-// 🔹 REGISTRO DE USUARIO CON ROL 🔹
-if (registerBtn) {
-  registerBtn.addEventListener("click", async () => {
+showLogin.addEventListener("click", () => {
+    registerContainer.classList.add("d-none");
+    loginContainer.classList.remove("d-none");
+});
+
+// REGISTRO DE USUARIO
+document.getElementById("registerBtn").addEventListener("click", async () => {
     const email = document.getElementById("registerEmail").value;
     const password = document.getElementById("registerPassword").value;
     const role = document.getElementById("registerRole").value;
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
 
-      // Guardamos el rol en Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
-        role: role
-      });
+        // Guardamos el rol en Firestore
+        await setDoc(doc(db, "users", user.uid), {
+            email: user.email,
+            role: role
+        });
 
-      alert("Usuario registrado con éxito. Ahora puedes iniciar sesión.");
+        alert("Usuario registrado con éxito. Ahora puedes iniciar sesión.");
+        showLogin.click();
     } catch (error) {
-      console.error("Error en el registro:", error.message);
-      alert(error.message);
+        alert(error.message);
     }
-  });
-}
+});
 
-// 🔹 INICIO DE SESIÓN 🔹
-if (loginBtn) {
-  loginBtn.addEventListener("click", async () => {
-    const email = document.getElementById("loginEmail").value;
-    const password = document.getElementById("loginPassword").value;
+// INICIO DE SESIÓN
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
 
-    try {
+  try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Obtenemos el rol del usuario desde Firestore
+      // Obtener datos del usuario desde Firestore
       const userDoc = await getDoc(doc(db, "users", user.uid));
+      
       if (userDoc.exists()) {
-        const userData = userDoc.data();
-        userRoleDisplay.textContent = `Rol: ${userData.role}`;
-        updateUI(user, userData.role); // Llamamos a updateUI con el rol
+          const userData = userDoc.data();
+          console.log("Rol del usuario:", userData.role);
 
-        // 🔀 Redirigir según el rol
-        if (userData.role === "admin") {
-          window.location.href = "admin_dashboard.html";
-        } else {
-          window.location.href = "user_dashboard.html";
-        }
+          if (userData.role === "admin") {
+              window.location.href = "admin_dashboard.html";
+          } else {
+              window.location.href = "user_dashboard.html";
+          }
       } else {
-        console.error("No se encontró el documento del usuario.");
+          alert("Error: No se encontraron datos del usuario.");
       }
-    } catch (error) {
-      console.error("Error en el inicio de sesión:", error.message);
+  } catch (error) {
       alert(error.message);
-    }
-  });
-}
-
-// 🔹 CIERRE DE SESIÓN 🔹
-if (logoutBtn) {
-  logoutBtn.addEventListener("click", async () => {
-    try {
-      await signOut(auth);
-      alert("Sesión cerrada.");
-      updateUI(null);
-      window.location.href = "index.html"; // Volver a la página principal
-    } catch (error) {
-      console.error("Error al cerrar sesión:", error.message);
-    }
-  });
-}
-
-// 🔹 VERIFICACIÓN DE USUARIO ACTIVO 🔹
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      updateUI(user, userData.role);
-
-      // 🔀 Redirigir automáticamente al dashboard si ya está autenticado
-      if (window.location.pathname === "/index.html") {
-        if (userData.role === "admin") {
-          window.location.href = "admin_dashboard.html";
-        } else {
-          window.location.href = "user_dashboard.html";
-        }
-      }
-    }
-  } else {
-    updateUI(null);
   }
 });
 
-// 🔹 ACTUALIZAR UI SEGÚN EL ESTADO DEL USUARIO 🔹
-function updateUI(user, role = "") {
-  if (user) {
-    userRoleDisplay.textContent = `Rol: ${role}`;
-    if (registerSection) registerSection.style.display = "none";  
-    if (loginSection) loginSection.style.display = "none";     
-    if (logoutBtn) logoutBtn.classList.remove("d-none");    
-  } else {
-    if (registerSection) registerSection.style.display = "block"; 
-    if (loginSection) loginSection.style.display = "block";    
-    if (logoutBtn) logoutBtn.classList.add("d-none");       
-    userRoleDisplay.textContent = "";
-  }
-}
